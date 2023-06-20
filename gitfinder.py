@@ -9,24 +9,21 @@ import encodings.idna
 import http.client
 
 
-def findgitrepo(output_file, domain_with_port):
-    domain, port = domain_with_port.split(':')
-    port = int(port)
-    
+def findgitrepo(output_file, domains):
     try:
-        domain = ".".join(encodings.idna.ToASCII(label).decode("ascii") for label in domain.strip().split("."))
+        domain = ".".join(encodings.idna.ToASCII(label).decode("ascii") for label in domains.strip().split("."))
     except (UnicodeError, ValueError):
         return
 
     try:
-        # Try to download https://target.tld:8443/.git/HEAD
-        with urlopen(''.join(['https://', domain, ':', str(port), '/.git/HEAD']), context=ssl._create_unverified_context(), timeout=5) as response:
+        # Try to download http://target.tld/.git/HEAD
+        with urlopen(''.join(['http://', domain, '/.git/HEAD']), context=ssl._create_unverified_context(), timeout=5) as response:
             answer = response.read(200).decode('utf-8', 'ignore')
 
     except (HTTPError, URLError, OSError, ConnectionResetError, ValueError):
         return
     except http.client.BadStatusLine:
-        print(f"BadStatusLine error for URL: https://{domain}:{port}/.git/HEAD")
+        print(f"BadStatusLine error for URL: http://{domain}/.git/HEAD")
         return
     except (KeyboardInterrupt, SystemExit):
         raise
@@ -44,7 +41,7 @@ def findgitrepo(output_file, domain_with_port):
 
 def read_file(filename):
     with open(filename) as file:
-        return [line.strip() for line in file.readlines()]
+        return file.readlines()
 
 
 def main():
@@ -74,14 +71,14 @@ def main():
         sys.exit(err)
 
     try:
-        domains_with_ports = read_file(domain_file)
+        domains = read_file(domain_file)
     except FileNotFoundError as err:
         sys.exit(err)
 
     fun = partial(findgitrepo, output_file)
     print("Scanning...")
     with Pool(processes=max_processes) as pool:
-        pool.map(fun, domains_with_ports)
+        pool.map(fun, domains)
     print("Finished")
 
 
